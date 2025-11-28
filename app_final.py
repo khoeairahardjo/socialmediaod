@@ -139,7 +139,7 @@ def get_gemini_analysis(branch_name, month, df_filtered, df_threshold, follower_
         e. Kepuasan pelanggan melalui standar pelayanan terbaik: Memiliki inisiatif tinggi untuk memenuhi kebutuhan pelanggan dan memastikan kepuasan mereka.
     Jawab berdasarkan penjelasan tematik yang ada di konteks.
     - Apakah variasi bentuk post sudah ideal di bulan itu? Ikuti aturan pada threshold. 
-
+    Ubah angka standar menjadi persentase, Contohnya : 0.0823 -> 8,23%
 
     **D. Rekomendasi**
     - Berdasarkan kolom “Action/Tindakan” di tabel Aturan untuk tingkat ER spesifik ini, apa yang harus dilakukan bulan depan? Tuliskan dengan beberapa poin saja.
@@ -148,7 +148,7 @@ def get_gemini_analysis(branch_name, month, df_filtered, df_threshold, follower_
     1. Judul Artikel A - Website A - Link Artikel
     2. Judul Artikel B - Website B - Link Artikel
 
-    Jawab tanpa menambahkan format apapun seperti "Baik, berikut jawaban saya" dan tanda seperti "`" dan "*", buat dalam bentuk poin-poin saja dengan menggunakan tanda "-"
+    Jawab tanpa menambahkan format apapun seperti "Baik, berikut jawaban saya" dan tanda seperti "`" dan "*", buat dalam bentuk poin-poin saja dengan menggunakan tanda "-".
     """
 
     try:
@@ -306,4 +306,5 @@ if file_exp and file_thresh:
     else:
         st.warning("Data Looker kosong atau format salah.")
 else:
+
     st.info("Silakan upload kedua file Excel di sidebar.")

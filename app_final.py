@@ -183,7 +183,7 @@ if file_exp and file_thresh:
         
         col1, col2 = st.columns(2)
         with col1:
-            branches = df_looker['Cabang'].dropna.unique()
+            branches = df_looker['Cabang'].dropna().unique()
             selected_branch = st.selectbox("Pilih Cabang (Branch)", branches)
         
         with col2:
@@ -308,4 +308,5 @@ if file_exp and file_thresh:
 else:
 
     st.info("Silakan upload kedua file Excel di sidebar.")
+
 

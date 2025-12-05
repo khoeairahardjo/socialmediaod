@@ -6,12 +6,9 @@ import openpyxl
 from google.genai import types
 import io
 
-# --- CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Midi AI Social Media Analyzer")
 
-# --- INITIALIZE CLIENT ---
 try:
-    # Ensure .streamlit/secrets.toml contains: GEMINI_API_KEY = "your_key_here"
     client = genai.Client(api_key=st.secrets['GEMINI_API_KEY'])
 except Exception as e:
     client = None
@@ -23,45 +20,41 @@ MONTH_ORDER = [
 ]
 MONTH_MAP = {month: i+1 for i, month in enumerate(MONTH_ORDER)}
 
-# --- FUNCTION 1: LOAD EKSPERIMEN DATA ---
-@st.cache_data
 def load_eksperimen_data(uploaded_file):
     """
-    Loads 'Looker' and 'Looker_ERTotal' sheets.
+    Loads 'Looker' sheet from an uploaded Excel file,
+    cleans the data, and returns the DataFrame.
     """
     try:
+        # Load the Excel file object
         xls = pd.ExcelFile(uploaded_file)
         
         # 1. LOAD LOOKER SHEET (Main Data)
-        if "Looker" in xls.sheet_names:
-            df_looker = pd.read_excel(xls, sheet_name="Looker")
+        sheet_name = "Looker"
+        if sheet_name in xls.sheet_names:
+            df_looker = pd.read_excel(xls, sheet_name=sheet_name)
             
-            # Data Cleaning
+            # --- Data Cleaning ---
+            # Convert specified columns to numeric, coercing errors to NaN
             numeric_cols = ['ER', 'Followers Total', 'Likes', 'Reach']
             for col in numeric_cols:
                 if col in df_looker.columns:
                     df_looker[col] = pd.to_numeric(df_looker[col], errors='coerce')
             
-            # Logic: Followers Count "Drags Down" (ffill)
+            # Logic: Fill missing 'Followers Total' values with the preceding non-null value (ffill)
             df_looker['Followers Total'] = df_looker['Followers Total'].fillna(method='ffill')
             
         else:
-            st.error("Sheet 'Looker' not found")
-            df_looker = pd.DataFrame()
+            st.error(f"Sheet '{sheet_name}' not found in the uploaded file.")
+            df_looker = pd.DataFrame() # Return an empty DataFrame on error
 
-        # 2. LOAD LOOKER_ERTOTAL (Summary Data)
-        if "Looker_ERTotal" in xls.sheet_names:
-            df_total = pd.read_excel(xls, sheet_name="Looker_ERTotal")
-            if 'ER%' in df_total.columns:
-                df_total['ER%'] = pd.to_numeric(df_total['ER%'], errors='coerce')
-        else:
-            df_total = pd.DataFrame()
-
-        return df_looker, df_total
+        # Only return the single DataFrame
+        return df_looker
 
     except Exception as e:
         st.error(f"Error loading Excel: {e}")
-        return pd.DataFrame(), pd.DataFrame()
+        # Return an empty DataFrame on overall loading error
+        return pd.DataFrame()
 
 # --- FUNCTION 2: LOAD THRESHOLD FILE ---
 @st.cache_data
@@ -139,7 +132,7 @@ def get_gemini_analysis(branch_name, month, df_filtered, df_threshold, follower_
         e. Kepuasan pelanggan melalui standar pelayanan terbaik: Memiliki inisiatif tinggi untuk memenuhi kebutuhan pelanggan dan memastikan kepuasan mereka.
     Jawab berdasarkan penjelasan tematik yang ada di konteks.
     - Apakah variasi bentuk post sudah ideal di bulan itu? Ikuti aturan pada threshold. 
-    Ubah angka standar menjadi persentase, Contohnya : 0.0823 -> 8,23%
+
 
     **D. Rekomendasi**
     - Berdasarkan kolom “Action/Tindakan” di tabel Aturan untuk tingkat ER spesifik ini, apa yang harus dilakukan bulan depan? Tuliskan dengan beberapa poin saja.
@@ -148,7 +141,7 @@ def get_gemini_analysis(branch_name, month, df_filtered, df_threshold, follower_
     1. Judul Artikel A - Website A - Link Artikel
     2. Judul Artikel B - Website B - Link Artikel
 
-    Jawab tanpa menambahkan format apapun seperti "Baik, berikut jawaban saya" dan tanda seperti "`" dan "*", buat dalam bentuk poin-poin saja dengan menggunakan tanda "-".
+    Jawab tanpa menambahkan format apapun seperti "Baik, berikut jawaban saya" dan tanda seperti "`" dan "*", buat dalam bentuk poin-poin saja dengan menggunakan tanda "-"
     """
 
     try:
@@ -173,7 +166,7 @@ file_thresh = st.sidebar.file_uploader("Upload Threshold File (Rules)", type=["x
 
 if file_exp and file_thresh:
     # Load Data
-    df_looker, df_total = load_eksperimen_data(file_exp)
+    df_looker = load_eksperimen_data(file_exp)
     df_threshold = load_threshold_file(file_thresh)
     
     if not df_looker.empty:
@@ -199,17 +192,16 @@ if file_exp and file_thresh:
         ].copy()
 
         if not df_filtered.empty:
-            # --- KEY METRICS ---
             current_followers = df_filtered['Followers Total'].max()
             
             official_er_val = 0
-            if not df_total.empty:
-                match = df_total[
-                    (df_total['Cabang'] == selected_branch) & 
-                    (df_total['Bulan'] == selected_month)
+            if not df_looker.empty:
+                match = df_looker[
+                    (df_looker['Cabang'] == selected_branch) & 
+                    (df_looker['Bulan'] == selected_month)
                 ]
                 if not match.empty:
-                    official_er_val = match['ER%'].values[0]
+                    official_er_val = match['ER'].mean()
 
             st.markdown("### 1. Performance Overview")
 
@@ -217,14 +209,13 @@ if file_exp and file_thresh:
             m1.metric("Followers Count", f"{current_followers:,.0f}")
             m3.metric("Official Monthly ER", f"{official_er_val:.2%}" if official_er_val else "N/A")
 
-            #---Visualization---
             st.markdown("### 2. Trend Analysis")
             
             c1, c2 = st.columns([2, 1], width="stretch")
             
             st.caption("ER per Post (Colored by ER % Intensity)")
             base = alt.Chart(df_filtered).encode(
-                x=alt.X('Judul Konten', axis=alt.Axis(labels=False), title='Content Posts'),
+                x=alt.X('Judul Konten', sort=None, axis=alt.Axis(labels=False), title='Content Posts'),
                 y=alt.Y('ER', axis=alt.Axis(format='%'))
             )  
 
@@ -306,7 +297,4 @@ if file_exp and file_thresh:
     else:
         st.warning("Data Looker kosong atau format salah.")
 else:
-
     st.info("Silakan upload kedua file Excel di sidebar.")
-
-
